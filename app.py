@@ -218,15 +218,15 @@ def excel_date_equal(value, target_date):
     return False
 
 
-def find_previous_cumulative(ws, report_date):
-    header_row = None
-    for r in range(1, ws.max_row + 1):
-        v = ws.cell(r, 1).value
-        if isinstance(v, str) and 'CUMMU DATA' in v.upper():
-            header_row = r
-            break
-    if header_row is None:
-        raise ValueError("Could not find cumulative section in Sheet2")
+# def find_previous_cumulative(ws, report_date):
+#     header_row = None
+#     for r in range(1, ws.max_row + 1):
+#         v = ws.cell(r, 1).value
+#         if isinstance(v, str) and 'CUMMU DATA' in v.upper():
+#             header_row = r
+#             break
+#     if header_row is None:
+#         raise ValueError("Could not find cumulative section in ")
 
     exact_value = None
     last_numeric_date = None
