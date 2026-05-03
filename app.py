@@ -400,7 +400,7 @@ def fill_template(
         monthly_increment = monthly_default if monthly_default else 0
 
     sms_date = sms_date_override or sms_payload['date'] or (report_date + timedelta(days=1))
-    new_cumulative = cum_info['base_value'] + monthly_increment
+    # new_cumulative = cum_info['base_value'] + monthly_increment
 
     prepaid_header_row = find_row_by_col_text(ws1, 2, 'PREPAID BILLING DATE', exact=True)
     prepaid_value_row = prepaid_header_row + 1 if prepaid_header_row else 3
@@ -461,7 +461,7 @@ def fill_template(
     ws1[f'D{monthly_value_row}'] = new_cumulative
 
     next_day = report_date + timedelta(days=1)
-    row_for_next_day = find_or_create_date_row(ws2, next_day, cum_info['header_row'] + 1)
+    # row_for_next_day = find_or_create_date_row(ws2, next_day, cum_info['header_row'] + 1)
     ws2.cell(row_for_next_day, 2).value = new_cumulative
 
     jio = processed['jio']
