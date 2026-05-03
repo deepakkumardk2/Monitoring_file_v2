@@ -393,7 +393,7 @@ def fill_template(
     ws2 = wb['Sheet2']
 
     monthly_default = sum(v for v in processed['monthly_billing_counts'].values() if isinstance(v, int))
-    cum_info = find_previous_cumulative(ws2, report_date)
+    # cum_info = find_previous_cumulative(ws2, report_date)
     sms_payload = parse_sms_raw_text(sms_raw_text)
 
     if monthly_increment is None:
