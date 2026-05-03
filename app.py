@@ -218,15 +218,15 @@ def excel_date_equal(value, target_date):
     return False
 
 
-# def find_previous_cumulative(ws, report_date):
-#     header_row = None
-#     for r in range(1, ws.max_row + 1):
-#         v = ws.cell(r, 1).value
-#         if isinstance(v, str) and 'CUMMU DATA' in v.upper():
-#             header_row = r
-#             break
-#     if header_row is None:
-#         raise ValueError("Could not find cumulative section in ")
+def find_previous_cumulative(ws, report_date):
+    header_row = None
+    for r in range(1, ws.max_row + 1):
+        v = ws.cell(r, 1).value
+        if isinstance(v, str) and 'CUMMU DATA' in v.upper():
+            header_row = r
+            break
+    if header_row is None:
+        raise ValueError("Could not find cumulative section in Sheet2")
 
     exact_value = None
     last_numeric_date = None
@@ -370,20 +370,40 @@ def build_output_filename(ws, report_date):
     return f"Job Monitoring UPPCL_{report_date.strftime('%d%m%Y')}__{cluster}.xlsm"
 
 
+def find_or_create_sheet2_monthly_row(ws, target_date, start_row=2, end_row=30):
+    blank_row = None
+    for row_no in range(start_row, end_row + 1):
+        row_date = ws.cell(row_no, 1).value
+        b = ws.cell(row_no, 2).value
+        c = ws.cell(row_no, 3).value
+        if excel_date_equal(row_date, target_date):
+            return row_no
+        if blank_row is None and row_date is None and b is None and c is None:
+            blank_row = row_no
+    return blank_row or start_row
+
+
+def compute_sheet2_monthly_total(ws, start_row=2, end_row=30):
+    total = 0
+    for row_no in range(start_row, end_row + 1):
+        total += as_int(ws.cell(row_no, 2).value) or 0
+        total += as_int(ws.cell(row_no, 3).value) or 0
+    return total
+
+
 def fill_template(
     template_path,
     prepaid_summary_path,
     processed_log_path,
-    mdm_path,
     billing_count,
     time_of_run,
     daily_billing_duration,
     sms_raw_text,
-    sms_date_override=None,
-    monthly_increment=None
+    normal_meter,
+    net_meter,
+    sms_date_override=None
 ):
     prepaid = extract_prepaid_summary_totals(prepaid_summary_path)
-    mdm = extract_prepaid_summary_totals(mdm_path or prepaid_summary_path)
     processed = parse_processed_log(processed_log_path)
 
     report_date = processed['report_date']
@@ -392,15 +412,8 @@ def fill_template(
     ws1 = wb['Sheet1']
     ws2 = wb['Sheet2']
 
-    monthly_default = sum(v for v in processed['monthly_billing_counts'].values() if isinstance(v, int))
-    # cum_info = find_previous_cumulative(ws2, report_date)
     sms_payload = parse_sms_raw_text(sms_raw_text)
-
-    if monthly_increment is None:
-        monthly_increment = monthly_default if monthly_default else 0
-
     sms_date = sms_date_override or sms_payload['date'] or (report_date + timedelta(days=1))
-    # new_cumulative = cum_info['base_value'] + monthly_increment
 
     prepaid_header_row = find_row_by_col_text(ws1, 2, 'PREPAID BILLING DATE', exact=True)
     prepaid_value_row = prepaid_header_row + 1 if prepaid_header_row else 3
@@ -454,15 +467,17 @@ def fill_template(
             continue
         ws1[f'D{row_no}'] = sms_payload['id_counts'].get(proposed_id, 0)
 
-    monthly_header_row = find_row_by_col_text(ws1, 2, 'Monthly Billing DATE', exact=True) or 30
+    monthly_row = find_or_create_sheet2_monthly_row(ws2, report_date)
+    ws2.cell(monthly_row, 1).value = report_date
+    ws2.cell(monthly_row, 2).value = normal_meter
+    ws2.cell(monthly_row, 3).value = net_meter
+    cumulative_monthly_total = compute_sheet2_monthly_total(ws2)
+
+    monthly_header_row = find_row_by_col_text(ws1, 2, 'Monthly Billing DATE', exact=True) or 32
     monthly_value_row = monthly_header_row + 1
     ws1[f'B{monthly_value_row}'] = report_date
-    ws1[f'C{monthly_value_row}'] = mdm['total_consumers']
-    # ws1[f'D{monthly_value_row}'] = new_cumulative
-
-    next_day = report_date + timedelta(days=1)
-    # row_for_next_day = find_or_create_date_row(ws2, next_day, cum_info['header_row'] + 1)
-    # ws2.cell(row_for_next_day, 2).value = new_cumulative
+    ws1[f'C{monthly_value_row}'] = prepaid['total_consumers']
+    ws1[f'D{monthly_value_row}'] = cumulative_monthly_total
 
     jio = processed['jio']
     jio_header_row = find_row_by_col_text(ws1, 2, 'JIO Data Sharing:DATE', exact=True) or 32
@@ -490,6 +505,7 @@ def fill_template(
         *(f'{col}{row_no}' for row_no in nfms_rows.keys() for col in ['D', 'E', 'F']),
         f'C{monthly_value_row}', f'D{monthly_value_row}',
         f'C{jio_value_row}', f'D{jio_value_row}', f'E{jio_value_row}',
+        f'B{monthly_row}', f'C{monthly_row}',
     ]
     for row_no in range(sms_header_row + 2, ws1.max_row + 1):
         proposed_id = normalize_sms_id(ws1[f'C{row_no}'].value)
@@ -501,8 +517,9 @@ def fill_template(
     for cell_ref in number_cells:
         ws1[cell_ref].number_format = '#,##0'
 
-    ws2.cell(row_for_next_day, 1).number_format = 'd/m/yyyy'
-    ws2.cell(row_for_next_day, 2).number_format = '#,##0'
+    ws2.cell(monthly_row, 1).number_format = 'd/m/yyyy'
+    ws2.cell(monthly_row, 2).number_format = '#,##0'
+    ws2.cell(monthly_row, 3).number_format = '#,##0'
 
     output = io.BytesIO()
     wb.save(output)
@@ -514,7 +531,9 @@ def fill_template(
         'report_date_file': report_date.strftime('%d%m%Y'),
         'sms_date': sms_date.strftime('%d/%m/%Y'),
         'sms_total_count': total_count,
-        # 'new_cumulative': new_cumulative,
+        'normal_meter': normal_meter,
+        'net_meter': net_meter,
+        'cumulative_data_shared_for_month': cumulative_monthly_total,
         'download_name': build_output_filename(ws1, report_date),
     }
 
@@ -613,13 +632,18 @@ HTML_PAGE = """
             </div>
 
             <div>
-                <label>MDM Eligible Count File (Optional)</label>
-                <input type="file" name="mdm_file" accept=".xlsx,.xlsm">
+                <label>Billing Count</label>
+                <input type="number" name="billing_count" required>
             </div>
 
             <div>
-                <label>Billing Count</label>
-                <input type="number" name="billing_count" required>
+                <label>Normal meters</label>
+                <input type="number" name="normal_meter" required>
+            </div>
+
+            <div>
+                <label>Net meter</label>
+                <input type="number" name="net_meter" required>
             </div>
 
             <div>
@@ -644,8 +668,7 @@ HTML_PAGE = """
             </div>
 
             <div class="full">
-                <label>Monthly Data Shared to Add (Optional)</label>
-                <input type="number" name="monthly_increment" placeholder="Cumulative data shared for the month">
+                <div class="help">Cumulative data shared for the month will be calculated automatically as Normal meters + Net meter entries stored in Sheet2.</div>
             </div>
 
             <div class="full">
@@ -718,7 +741,6 @@ def generate():
         template_file = request.files.get("template_file")
         prepaid_summary_file = request.files.get("prepaid_summary_file")
         processed_log_file = request.files.get("processed_log_file")
-        mdm_file = request.files.get("mdm_file")
 
         if not template_file or not template_file.filename:
             return jsonify({"error": "Template XLSM file is required."}), 400
@@ -728,14 +750,19 @@ def generate():
             return jsonify({"error": "Processed Data Log file is required."}), 400
 
         billing_count_raw = request.form.get("billing_count", "").strip()
+        normal_meter_raw = request.form.get("normal_meter", "").strip()
+        net_meter_raw = request.form.get("net_meter", "").strip()
         time_of_run_raw = request.form.get("time_of_run", "").strip()
         daily_billing_duration_raw = request.form.get("daily_billing_duration", "").strip()
         sms_date_raw = request.form.get("sms_date", "").strip()
         sms_raw_text = request.form.get("sms_raw_text", "").strip()
-        monthly_increment_raw = request.form.get("monthly_increment", "").strip()
 
         if not billing_count_raw:
             return jsonify({"error": "Billing Count is required."}), 400
+        if not normal_meter_raw:
+            return jsonify({"error": "Normal meters is required."}), 400
+        if not net_meter_raw:
+            return jsonify({"error": "Net meter is required."}), 400
         if not time_of_run_raw:
             return jsonify({"error": "Time of Run is required."}), 400
         if not daily_billing_duration_raw:
@@ -744,13 +771,11 @@ def generate():
             return jsonify({"error": "SMS Raw Data is required."}), 400
 
         billing_count = int(billing_count_raw.replace(",", ""))
+        normal_meter = int(normal_meter_raw.replace(",", ""))
+        net_meter = int(net_meter_raw.replace(",", ""))
         time_of_run = parse_time_value(time_of_run_raw)
         daily_billing_duration = parse_duration_text(daily_billing_duration_raw)
         sms_date_override = parse_flexible_date(sms_date_raw) if sms_date_raw else None
-
-        monthly_increment = None
-        if monthly_increment_raw:
-            monthly_increment = int(monthly_increment_raw.replace(",", ""))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             template_path = os.path.join(tmpdir, secure_name(template_file.filename, "template.xlsm"))
@@ -761,22 +786,17 @@ def generate():
             prepaid_summary_file.save(prepaid_path)
             processed_log_file.save(processed_path)
 
-            mdm_path = prepaid_path
-            if mdm_file and mdm_file.filename:
-                mdm_path = os.path.join(tmpdir, secure_name(mdm_file.filename, "mdm.xlsx"))
-                mdm_file.save(mdm_path)
-
             output_stream, meta = fill_template(
                 template_path=template_path,
                 prepaid_summary_path=prepaid_path,
                 processed_log_path=processed_path,
-                mdm_path=mdm_path,
                 billing_count=billing_count,
                 time_of_run=time_of_run,
                 daily_billing_duration=daily_billing_duration,
                 sms_raw_text=sms_raw_text,
-                sms_date_override=sms_date_override,
-                monthly_increment=monthly_increment
+                normal_meter=normal_meter,
+                net_meter=net_meter,
+                sms_date_override=sms_date_override
             )
 
             return send_file(
