@@ -458,11 +458,11 @@ def fill_template(
     monthly_value_row = monthly_header_row + 1
     ws1[f'B{monthly_value_row}'] = report_date
     ws1[f'C{monthly_value_row}'] = mdm['total_consumers']
-    ws1[f'D{monthly_value_row}'] = new_cumulative
+    # ws1[f'D{monthly_value_row}'] = new_cumulative
 
     next_day = report_date + timedelta(days=1)
     # row_for_next_day = find_or_create_date_row(ws2, next_day, cum_info['header_row'] + 1)
-    ws2.cell(row_for_next_day, 2).value = new_cumulative
+    # ws2.cell(row_for_next_day, 2).value = new_cumulative
 
     jio = processed['jio']
     jio_header_row = find_row_by_col_text(ws1, 2, 'JIO Data Sharing:DATE', exact=True) or 32
@@ -514,7 +514,7 @@ def fill_template(
         'report_date_file': report_date.strftime('%d%m%Y'),
         'sms_date': sms_date.strftime('%d/%m/%Y'),
         'sms_total_count': total_count,
-        'new_cumulative': new_cumulative,
+        # 'new_cumulative': new_cumulative,
         'download_name': build_output_filename(ws1, report_date),
     }
 
