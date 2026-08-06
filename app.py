@@ -2572,11 +2572,11 @@ HTML_PAGE = """
             <div class="full">
                 <label>SMS Raw Data</label>
                 <textarea name="sms_raw_text" rows="12" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #ccd6e0; border-radius:8px; font-size:14px;" placeholder="Paste full SMS block here, e.g. DATE:-4/24/2026 ... PU01 TOTAL 638,646 ..."></textarea>
-                <div class="help">You can paste the full SMS section text. The app will auto-pick SMS date, total count, PU code, and ID-wise counts.</div>
+                <div class="help">Mai huun DON</div>
             </div>
 
             <div class="full">
-                <div class="help">Cumulative data shared for the month will be calculated automatically as Normal meters + Net meter entries stored in Sheet2.</div>
+                <div class="help">Always try to push your limit</div>
             </div>
 
             <div class="full">
